@@ -27,6 +27,19 @@ then
 fi
 
 
+if [[ -z "${NUM_USERS}" ]];
+then
+  echo "Error: environment variable NUM_USERS not set."
+  exit
+fi
+
+
+if [[ -z "${PROJECT_ROOT}" ]];
+then
+  echo "Error: environment variable PROJECT_ROOT not set."
+  exit
+fi
+
 test -d test_sgx || mkdir test_sgx
 cd ./test_sgx
 rm -rf *
@@ -59,31 +72,12 @@ fi
 
 
 ### 0.2 BulletinBoard INIT: ... ###
-
-# ./run_BB.py ?
-# [TODO][NERLA]: I only placed this here temporarily, BulletinBoard init might go after the signed pubkey list (pubkeys.sig) is published by initPVRA, I am not sure
-
-
-# ./gen_user_keys.py ?
-# [TODO][NERLA]: Implement the script to generate 5 secp256k1 user key pairs (MAX_USERS=5 in enclavestate.h right now)  
-# Saves files to <user0_pubkey.bin, user0_prikey.bin> ...
-# Save a list of pubkeys with the preamble "5\n" and one hexstring user pubkey per line
-# The enclave public signing key is available AFTER initPVRA in: enclave_enc_pubkey.bin
-
-
-
-# Placeholder user0 key
-echo "728c48ee66b4229ca476914fc87130014f5bd5eda29116578b2fc2dca01f4b7eb88b77acc107d4136649c470de332962daf17eeead91e5b253fa9912caa94d11" | xxd -r -p > user0_pubkey.bin
-echo "0a9f3adcd54ee2043315210dd6a4d2c8f90590733a227d6fc4a08724543a24e2" | xxd -r -p > user0_prikey.bin
-
-# Placeholder for pubkeys list
-# Run this if you need a sample of what the pubkeys.list should look like
-echo -e "5\n728c48ee66b4229ca476914fc87130014f5bd5eda29116578b2fc2dca01f4b7eb88b77acc107d4136649c470de332962daf17eeead91e5b253fa9912caa94d11\na388161f5b0fd97c1d7cfac645c5552d67da1c4706688736d3f9a4866dcbdd4956cde955303477fe9eb5bf4617e08ca18eaaf1b7a58eecb96a9714e28a16e6c5\n86093073acda4891e1da447ee9661e32ede352998a8663174b5c2be43c995cdaa4fca5ea32322ab70cb60bba1fd45acff7afe70d076effe47dddd7f8d39d8a74\n54ffdd443c49155b45771a38680d9531b564eec830416ceee9a75189f4252f1712225efc807a0349c72eae337bf657aceddffacedf3598dde707701ab97f5412\ncb731cf5bb5f82298be5a7e80759b6a74c9ff5f48b8bc81da760eb49366857e40a9c59e552b5a0ac570b3aa1dce14fe1fab3d4c751ab9b033f0fc36bc28bdb49" > pubkeys.list
-
-
-
-
-
+../stop_BB.sh
+sleep 1
+../run_BB.sh
+export BILLBOARD_URL="http://$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' billboard):8545"
+echo "BILLBOARD_URL=$BILLBOARD_URL"
+python3 ../gen_user_keys.py
 
 
 ### 1.0 INITIALIZE PVRA ENCLAVE ###
@@ -106,56 +100,23 @@ cp sealedState.bin sealedState0.bin
 echo ""
 echo "[biPVRA] Running Auditee to Extract PVRA signing_key"
 
-source ~/.venvs/auditee/bin/activate
-python3.7 ../auditee_extract.py
+#source ~/.venvs/auditee/bin/activate
+#python3.7 ../auditee_extract.py
+python3 ../auditee_extract.py
+#source ~/.venvs/auditee/bin/activate deactivate
 
-
-
-
-# [TODO][NERLA]: ias_report.json needs to be posted to Bulletin Board
-# Let me know if it needs to be signed by the enclave
-# This is returned AFTER initPVRA returns the quote, quote is sent to intel and ias_report.json comes back
-# We will have to run ANOTHER ecall to sign it by the enclave
-# Alternatively the admin has a key pair, and the admin signs it because the admin is the person with the SPID that requests the ias_report from intel?
-
-
-
-
-
+# [TODO][NERLA]: ask sylvain which part of ias_report to post in order to verify enclave sig offline
 
 ### 2.0 PREPARE TO RUN PVRA APPLICATION ###
 
 ### 2.1 Verify signed enclave encryption key using signingkey.pem (extracted enclave signing key) ###
 
 echo -n "[biPVRA] Verifying signed encryption key: "
-openssl dgst -sha256 -verify signingkey.pem -signature enclave_enc_pubkey.sig enclave_enc_pubkey.bin
+#openssl dgst -sha256 -verify signingkey.pem -signature enclave_enc_pubkey.sig enclave_enc_pubkey.bin
+python3 $PROJECT_ROOT/billboard/crypto.py verify_secp256k1_path signingkey.bin enclave_enc_pubkey.bin enclave_enc_pubkey.sig
 
-
-
-
-
-### 2.2 Verify signed user pubkeys using signingkey.pem (extracted enclave signing key), the same action carried out by the billboard ###
-
-# The blob enclave signed: hash(64b[user0_pubkey] || 64b[user1_pubkey] || ... || 64b[user4_pubkey])
-# This bash code recreates that blob and hash
-
-touch pubkeys_to_be_hashed.bin
-
-line=$(head -n 1 pubkeys.list)
-num_keys=$(($line))
-iter=2
-
-while [ $num_keys != 0 ]
-do
-  out=$(awk "FNR>=${iter} && FNR <=${iter}" pubkeys.list | xxd -p -r >> pubkeys_to_be_hashed.bin)
-  num_keys=$(($num_keys-1))
-  iter=$(($iter+1))
-done
-
-echo -n "[biPVRA] Verifying signed userpubkeys: "
-openssl dgst -sha256 -verify signingkey.pem -signature pubkeys.sig pubkeys_to_be_hashed.bin
-
-
+echo -n "[biPVRA] Initialize billboard and Verifying signed userpubkeys:"
+python3 $PROJECT_ROOT/billboard/billboard.py admin_init_contract pubkeys.list pubkeys.sig
 
 
 ### 2.2 SETUP CLIENT ENVIRONMENT ###
@@ -172,10 +133,10 @@ cp ../format_command ./client
 cp ./user0_pubkey.bin ./client
 cp ./user0_prikey.bin ./client
 
-# [TODO][NERLA]: If you write your ECDH script in client_ecdh.py nothing needs to be done
 # Otherwise copy your script to client environment
 cp ../client_ecdh.py ./client
 
+cp ../gen_ecdh.py ./client
 
 ### 2.3 SETUP HOST ENVIRONMENT ###
 mkdir host
@@ -184,6 +145,7 @@ cp ../pvraHostCommand.sh ./host
 cp ../pvraAuditCommand.sh ./host
 cp ./sealedState0.bin ./host
 cp ./signingkey.pem ./host
+cp ./signingkey.bin ./host
 if [[ ${CCF_ENABLE} == "1" ]];
 then
   cp ../service_cert.pem ./host
