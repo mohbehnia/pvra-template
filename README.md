@@ -80,23 +80,14 @@ In order to run an existing application pass the APP_NAME to ```./setup.sh``` sc
 	```
 
 
+#### State Continuity Setup
 
-## Bulletin Board Integration Check-list
-
-- [ ] ```./admin.sh``` 
-	- [ ] ```init_BB.py```
-	- [ ] ```gen_client_keys.py```
-	- [ ] POST ```ias_report.json``` to BB
-	- [ ] COPY USER KEY PAIRS TO ./client
-	- [ ] COPY USER ECDH SCRIPT TO ./client
-
-- [ ] ```./pvraClientCommand.sh``` 
-	- [ ] ```client_ecdh.py```
+- [ ] Add detailed instructions on how to setup SCS
 
 
-- [ ] ```./applications/<APP_NAME>/client.sh``` GET ```ias_report.json``` from BB
+#### Bulletin Board
 
-- [ ] ```./applications/<APP_NAME>/host.sh``` POST signed AUDIT_LOG to BB
+
 
 
 ### Sample VSC Run:
