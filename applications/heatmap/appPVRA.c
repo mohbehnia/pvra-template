@@ -134,6 +134,11 @@ int initES(struct ES* enclave_state, struct dAppData *dAD)
     dDS[0] = tDS;
     dDS[1] = nDS;
     dAD->dDS = dDS;
+
+
+    /* Initialize command metadata */
+    enclave_state->cmdmetadata.privileged[0] = false;
+    enclave_state->cmdmetadata.privileged[1] = true;
     return 0;
 }
 

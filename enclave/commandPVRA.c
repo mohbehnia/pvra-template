@@ -419,6 +419,15 @@ sgx_status_t ecall_commandPVRA(
     goto cleanup;
   }
 
+  // Privilege Check (user_idx of 0 == admin)
+  if(enclave_state.cmdmetadata.privileged[CC.eCMD.CT.tid] == true) {
+    if(user_idx != 0) {
+      printf("[ecPVRA] ERROR User not privileged to execute command.\n");
+      ret = SGX_ERROR_INVALID_PARAMETER;
+      goto cleanup;
+    }
+  }
+
   struct cResponse cRet;
 
   /*   APPLICATION KERNEL INVOKED    */

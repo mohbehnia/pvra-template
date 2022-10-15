@@ -85,6 +85,14 @@ struct AR
 };
 
 
+struct CM
+{
+	bool privileged[NUM_COMMANDS];
+	bool deterministic[NUM_COMMANDS];
+};
+
+
+
 struct ES
 {
 	struct EK enclavekeys;
@@ -92,6 +100,7 @@ struct ES
 	struct AR antireplay;
 	struct AD appdata;
 	struct AUD auditmetadata;
+	struct CM cmdmetadata;
 }; 
 
 
