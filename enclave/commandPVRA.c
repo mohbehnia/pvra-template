@@ -427,6 +427,7 @@ sgx_status_t ecall_commandPVRA(
     ret = SGX_ERROR_INVALID_PARAMETER;
     goto cleanup;
   }
+
   struct cResponse cRet;
   /*   APPLICATION KERNEL INVOKED    */
   cRet = (*functions[CC.eCMD.CT])(&enclave_state, &CC.eCMD.CI);
